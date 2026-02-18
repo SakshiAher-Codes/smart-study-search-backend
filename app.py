@@ -1,72 +1,73 @@
 import streamlit as st
 import requests
+import subprocess
+import time
+import os
 
-# Backend URL
-BACKEND_URL = "http://127.0.0.1:8000"
+# Start FastAPI backend
+if "backend_started" not in st.session_state:
+    subprocess.Popen(
+        ["uvicorn", "main:app", "--host", "0.0.0.0", "--port", "8000"]
+    )
+    time.sleep(5)
+    st.session_state.backend_started = True
 
-st.set_page_config(page_title="Smart Study Search", layout="centered")
 
-# Title
+BACKEND_URL = "http://localhost:8000"
+
+st.set_page_config(page_title="Smart Study Search")
+
 st.title("📚 Smart Study Search System")
-st.write("AI-powered search for college study materials")
+st.write("AI-powered academic search platform")
 
 st.divider()
 
-# Upload Section 
-st.subheader("📂 Upload Study Material")
+#Upload
+st.subheader("📂 Upload PDF")
 
-uploaded_file = st.file_uploader("Choose a PDF file", type=["pdf"])
+uploaded_file = st.file_uploader("Choose PDF", type=["pdf"])
 
-if st.button("Upload") and uploaded_file is not None:
+if st.button("Upload") and uploaded_file:
 
     files = {
         "file": (uploaded_file.name, uploaded_file, "application/pdf")
     }
 
-    with st.spinner("Uploading..."):
-        response = requests.post(
-            f"{BACKEND_URL}/upload/",
-            files=files
-        )
+    res = requests.post(f"{BACKEND_URL}/upload/", files=files)
 
-    if response.status_code == 200:
-        st.success("File uploaded successfully!")
+    if res.status_code == 200:
+        st.success("Uploaded successfully!")
     else:
         st.error("Upload failed")
 
 
 st.divider()
 
-# Search Section 
-st.subheader("🔍 Search Your Doubt")
+# Search 
+st.subheader("🔍 Search")
 
 query = st.text_input("Enter your question")
 
 if st.button("Search") and query:
 
-    params = {
-        "query": query
-    }
+    res = requests.get(
+        f"{BACKEND_URL}/search/",
+        params={"query": query}
+    )
 
-    with st.spinner("Searching..."):
-        response = requests.get(
-            f"{BACKEND_URL}/search/",
-            params=params
-        )
+    if res.status_code == 200:
 
-    if response.status_code == 200:
+        data = res.json()
 
-        data = response.json()
-        results = data["results"]
+        st.subheader("Results")
 
-        st.subheader("📄 Results")
+        if len(data["results"]) == 0:
+            st.info("No results found")
 
-        if len(results) == 0:
-            st.info("No matching documents found")
-
-        for i, doc in enumerate(results, 1):
+        for i, doc in enumerate(data["results"], 1):
             st.markdown(f"### {i}. {doc['name']}")
             st.write(doc["content"] + "...")
 
     else:
         st.error("Search failed")
+
